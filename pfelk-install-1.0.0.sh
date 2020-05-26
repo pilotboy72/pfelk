@@ -1137,7 +1137,7 @@ if [[ "${openjdk_11_installed}" == 'true' && "${unsupported_java_installed}" == 
           awk '!a[$0]++' /tmp/pfELK/java/unsupported_java_list_tmp >> /tmp/pfELK/java/unsupported_java_list; rm --force /tmp/pfELK/java/unsupported_java_list_tmp 2> /dev/null
           echo -e "\\n------- $(date +%F-%R) -------\\n" &>> "${pfELK_dir}/logs/java_uninstall.log"
           while read -r package; do
-            apt-get remove "${package}" -y &>> "${pfELK_dir}/logs/java_uninstall.log" && echo -e "${WHITE_R}#${RESET} Successfully removed ${package}." || echo -e "${WHITE_R}#${RESET} Failed to remove ${package}."
+            apt-get -y remove "${package}" &>> "${pfELK_dir}/logs/java_uninstall.log" && echo -e "${WHITE_R}#${RESET} Successfully removed ${package}." || echo -e "${WHITE_R}#${RESET} Failed to remove ${package}."
           done < /tmp/pfELK/java/unsupported_java_list
           rm --force /tmp/pfELK/java/unsupported_java_list &> /dev/null
           echo -e "\\n" && sleep 3;;
