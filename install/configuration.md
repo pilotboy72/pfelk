@@ -37,7 +37,7 @@ Copy the entire results to your clipboard
 ### 1c. Update the logstash configuration (Optional & pfSense Only)
 - Go back to the server you installed pfELK on.
 ```
-sudo nano /data/pfELK/configurations/35-rules-desc.conf
+sudo nano /etc/logstash/conf.d/35-rules-desc.conf
 ```
 - Paste the the results from pfSense into the first blank line after `"0"=> "null"`
 #### You must repeat step 1 (Rules) if you add new rules in pfSense and then restart logstash
@@ -112,6 +112,12 @@ systemctl start logstash.service
  - Save logs = Any Value You Desire
  - Click Apply
 ![OPNsense-Suricata](https://raw.githubusercontent.com/3ilson/pfelk/master/Images/opnsense-suricata.png)
+### 5e. Configure Snort for log forwarding - pfsense (Optional)
+- In pfsense navigate to Services->Snort->Snort Interfaces
+ - For each interface you have configured, choose the edit pencil to the right (repeat these steps for each)
+ - In each "Interface" Settings -> under Alert Settings check Send Alerts to System Log
+ - Scroll down and Choose Save
+ ![Snort-Log-Settings](https://raw.githubusercontent.com/3ilson/pfelk/master/Images/snort-log-settings.png) 
 # Kibana 
 ### 6a. Configuring Patterns
 [YouTube Guide](https://www.youtube.com/watch?v=uBSRaUOgEz8)

@@ -197,7 +197,8 @@ while [ -n "$1" ]; do
        script_option_nojava=true
        echo "--nojava" &>> /tmp/pfELK/script_options;;
   --nosense)
-       echo "--noip" &>> /tmp/pfELK/script_options;;
+       script_option_nosense=true
+       echo "--nosense" &>> /tmp/pfELK/script_options;;
   esac
   shift
 done
@@ -210,7 +211,7 @@ grep -io '${pfELK_dir}/logs/.*log' "$0" | grep -v 'awk' | awk '!a[$0]++' &> /tmp
 while read -r log_file; do
   if [[ -f "${log_file}" ]]; then
     log_file_size=$(stat -c%s "${log_file}")
-    if [[ "${log_file_size}" -gt "10485760" ]]; then
+    if [[ "${log_file_size}" -gt "10000000" ]]; then
       tail -n1000 "${log_file}" &> "${log_file}.tmp"
       cp "${log_file}.tmp" "${log_file}"; rm --force "${log_file}.tmp" &> /dev/null
     fi
@@ -376,6 +377,19 @@ if ! [[ -d /tmp/pfELK/keys ]]; then mkdir -p /tmp/pfELK/keys; fi
 # Check if --show-progrss is supported in wget version
 if wget --help | grep -q '\--show-progress'; then echo "--show-progress" &>> /tmp/pfELK/wget_option; fi
 if [[ -f /tmp/pfELK/wget_option && -s /tmp/pfELK/wget_option ]]; then IFS=" " read -r -a wget_progress <<< "$(tr '\r\n' ' ' < /tmp/pfELK/wget_option)"; fi
+
+# Check if MaxMind GeoIP is already installed.
+if dpkg -l | grep "geoipupdate" | grep -q "^ii\\|^hi"; then
+  header
+  echo -e "${WHITE_R}#${RESET} MaxMind GeoIP is already installed on your system!${RESET}\\n\\n"
+  read -rp $'\033[39m#\033[0m Would you like to remove MaxMind GeoIP? (Y/n) ' yes_no
+  case "$yes_no" in
+      [Yy]*|"")
+        rm --force "$0" 2> /dev/null
+        apt purge geoipupdate;;
+      [Nn]*);;
+  esac
+fi
 
 # Check if Elasticsearch is already installed.
 if dpkg -l | grep "elasticsearch" | grep -q "^ii\\|^hi"; then
@@ -603,7 +617,14 @@ if ! dpkg -l sudo 2> /dev/null | awk '{print $1}' | grep -iq "^ii\\|^hi"; then
 fi
 
 #MaxMind GeoIP Install.
-read -rp $'\033[39m#\033[0m Do you have your a MaxMind Account and Passowrd credentials? (y/N) ' yes_no
+if dpkg -l | grep "geoipupdate" | grep -q "^ii\\|^hi"; then
+   header
+   echo -e "${WHITE_R}#${RESET} MaxMind GeoIP is already installed!${RESET}"; 
+   echo -e "${WHITE_R}#${RESET} Ensure MaxMind GeoIP is properly configured!${RESET}";
+   echo -e "${RED}# WARNING${RESET} Running Logstash without MaxMind properly configured will result in fatal errors...\\n\\n"
+   sleep 5;
+else
+read -rp $'\033[39m#\033[0m Do you have your MaxMind Account and Passowrd credentials? (y/N) ' yes_no
   case "$yes_no" in
    [Yy]*)
      if [[ "${script_option_geoip}" != 'true' ]]; then
@@ -624,20 +645,23 @@ read -rp $'\033[39m#\033[0m Do you have your a MaxMind Account and Passowrd cred
 	 #GeoIP Cron Job.
 	 echo 00 17 * * 0 geoipupdate -d /data/pfELK/GeoIP > /etc/cron.weekly/geoipupdate
 	 sed -i 's/EditionIDs.*/EditionIDs GeoLite2-Country GeoLite2-City GeoLite2-ASN/g' /etc/GeoIP.conf
-	 sed -i "s/.*DatabaseDirectory.*/DatabaseDirectory \/data\/pfELK\/GeoIP\//g" /etc/GeoIP.conf
-      maxmind_username=$(echo "${maxmind_username}")
-      maxmind_password=$(echo "${maxmind_password}")
-      read -p "Enter your MaxMind Account ID: " maxmind_username
-      read -p "Enter your MaxMind Password: " maxmind_password
-      sed -i "s/AccountID.*/AccountID ${maxmind_username}/g" /etc/GeoIP.conf
-      sed -i "s/LicenseKey.*/LicenseKey ${maxmind_password}/g" /etc/GeoIP.conf
-      echo -e "\\n";
-      geoipupdate
-      sleep 3
-      echo -e "\\n";;
-   [No]*|"") ;;
- esac
-
+	 #sed -i "1 s/.*DatabaseDirectory.*/DatabaseDirectory \/usr\/share\/GeoIP\//g" /etc/GeoIP.conf
+	 maxmind_username=$(echo "${maxmind_username}")
+	 maxmind_password=$(echo "${maxmind_password}")
+	 read -p "Enter your MaxMind Account ID: " maxmind_username
+	 read -p "Enter your MaxMind License Key: " maxmind_password
+	 sed -i "s/AccountID.*/AccountID ${maxmind_username}/g" /etc/GeoIP.conf
+	 sed -i "s/LicenseKey.*/LicenseKey ${maxmind_password}/g" /etc/GeoIP.conf
+	 echo -e "\\n";
+	 geoipupdate -d /usr/share/GeoIP
+	 sleep 2
+	 echo -e "\\n";;
+   [No]*|"") 
+	 echo -e "${RED}#${RESET} MaxMind v${maxmind_version} not installed!"
+	 echo -e "${RED}#WARNING${RESET} Running Logstash without MaxMind will result in fatal errors...\\n"
+	 sleep 2;;
+   esac
+fi
 
 #lsb-release Install.
 if ! dpkg -l lsb-release 2> /dev/null | awk '{print $1}' | grep -iq "^ii\\|^hi"; then
@@ -838,7 +862,7 @@ if [[ "${curl_missing}" == 'true' ]]; then script_version_check; fi
 if [ "${system_free_disk_space}" -lt "5000000" ]; then
   header_red
   echo -e "${WHITE_R}#${RESET} Free disk space is below 5GB.. Please expand the disk size!"
-  echo -e "${WHITE_R}#${RESET} I recommend expanding to atleast 10GB\\n\\n"
+  echo -e "${WHITE_R}#${RESET} It is recommend tha avilalble sapce be expanding to at least 10GB\\n\\n"
   if [[ "${script_option_skip}" != 'true' ]]; then
     read -rp "Do you want to proceed at your own risk? (Y/n)" yes_no
     case "$yes_no" in
@@ -850,51 +874,22 @@ if [ "${system_free_disk_space}" -lt "5000000" ]; then
   fi
 fi
 
-# Memory and Swap file.
+# Memory.
 if [[ "${system_swap}" == "0" && "${system_memory}" -lt "4" ]]; then
   header_red
-  echo -e "${WHITE_R}#${RESET} System memory is lower than recommended!\\n"
+  echo -e "${WHITE_R}#${RESET} System memory does not meet minimum and may not run!"
+  echo -e "${WHITE_R}#${RESET} It is recommend that ram is expanded to at least 8GB\\n\\n"
+  swapoff -a
   sleep 2
-  if [[ "${system_free_disk_space}" -ge "10000000" ]]; then
-    echo -e "${WHITE_R}---${RESET}\\n"
-    echo -e "${WHITE_R}#${RESET} You have more than 10GB of free disk space!"
-    echo -e "${WHITE_R}#${RESET} We are creating a 2GB swap file!\\n"
-    dd if=/dev/zero of=/swapfile bs=2048 count=1048576 &>/dev/null
-    chmod 600 /swapfile &>/dev/null
-    mkswap /swapfile &>/dev/null
-    swapon /swapfile &>/dev/null
-    echo "/swapfile swap swap defaults 0 0" | tee -a /etc/fstab &>/dev/null
-  elif [[ "${system_free_disk_space}" -ge "5000000" ]]; then
-    echo -e "${WHITE_R}---${RESET}\\n"
-    echo -e "${WHITE_R}#${RESET} You have more than 5GB of free disk space."
-    echo -e "${WHITE_R}#${RESET} We are creating a 1GB swap file..\\n"
-    dd if=/dev/zero of=/swapfile bs=1024 count=1048576 &>/dev/null
-    chmod 600 /swapfile &>/dev/null
-    mkswap /swapfile &>/dev/null
-    swapon /swapfile &>/dev/null
-    echo "/swapfile swap swap defaults 0 0" | tee -a /etc/fstab &>/dev/null
-  elif [[ "${system_free_disk_space}" -ge "4000000" ]]; then
-    echo -e "${WHITE_R}---${RESET}\\n"
-    echo -e "${WHITE_R}#${RESET} You have more than 4GB of free disk space."
-    echo -e "${WHITE_R}#${RESET} We are creating a 256MB swap file..\\n"
-    dd if=/dev/zero of=/swapfile bs=256 count=1048576 &>/dev/null
-    chmod 600 /swapfile &>/dev/null
-    mkswap /swapfile &>/dev/null
-    swapon /swapfile &>/dev/null
-    echo "/swapfile swap swap defaults 0 0" | tee -a /etc/fstab &>/dev/null
-  elif [[ "${system_free_disk_space}" -lt "5000000" ]]; then
-    echo -e "${WHITE_R}---${RESET}\\n"
-    echo -e "${WHITE_R}#${RESET} Your available ram is extremely low!"
-    echo -e "${WHITE_R}#${RESET} There is not enough free disk space to create a swap file..\\n"
-    echo -e "${WHITE_R}#${RESET} I highly recommend upgrading the system memory to at least 8GB!"
-    echo -e "${WHITE_R}#${RESET} The script will continue the script at your own risk..\\n"
-   sleep 10
-  fi
 else
   header
   echo -e "${WHITE_R}#${RESET} Memory Meets Minimum Requirements!\\n\\n"
+  swapoff -a
   sleep 2
 fi
+
+#MaxMind GeoIP
+#Added check to ensure GeoIP database files were downloaded.
 
 ###################################################################################################################################################################################################
 #                                                                                                                                                                                                 #
@@ -922,35 +917,9 @@ fi
 ###################################################################################################################################################################################################
 
 start_pfelk() {
-  swapoff -a
-  mkdir -p /data/pfELK
-  mkdir /data/pfELK/patterns
-  mkdir /data/pfELK/templates
-  mkdir /data/pfELK/configurations
-  mkdir /data/pfELK/GeoIP
-  chmod +777 /data/pfELK/logs
-  cd /data/pfELK/configurations
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/configurations/01-inputs.conf
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/configurations/05-firewall.conf
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/configurations/10-others.conf
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/configurations/20-suricata.conf
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/configurations/25-snort.conf
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/configurations/30-geoip.conf
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/configurations/35-rules-desc.conf
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/configurations/45-cleanup.conf
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/configurations/50-outputs.conf
-  cd /data/pfELK/patterns
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/patterns/pfelk.grok
-  cd /data/pfELK/templates
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/data/templates/pf-geoip-template.json
-  cd /data/pfELK
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/error-data.sh
-  chmod +x /data/pfELK/error-data.sh
-  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/readme.txt
   wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
   header
   script_logo
-  echo -e "\\n${WHITE_R}#${RESET} Setting up pfELK File Structure.\\n\\n"
   sleep 4
 }
 start_pfelk
@@ -1201,6 +1170,81 @@ if [[ "${pfelk_dependencies}" == 'fail' ]]; then
 fi
 sleep 3
 
+###################################################################################################################################################################################################
+#                                                                                                                                                                                                 #
+#                                                                               Download and Configure pfELK Files                                                                                #
+#                                                                                                                                                                                                 #
+###################################################################################################################################################################################################
+
+download_pfelk() {
+  mkdir -p /etc/kibana	
+  cd /etc/kibana
+  rm /etc/kibana/kibana.yml
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/kibana.yml
+  mkdir -p /etc/logstash/conf.d/patterns
+  mkdir -p /etc/logstash/conf.d/templates
+  cd /etc/logstash/conf.d/
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/01-inputs.conf
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/05-firewall.conf
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/10-others.conf
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/20-suricata.conf
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/25-snort.conf
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/30-geoip.conf
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/35-rules-desc.conf
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/45-cleanup.conf
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/50-outputs.conf
+  cd /etc/logstash/conf.d/patterns/
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/patterns/pfelk.grok
+  cd /etc/logstash/conf.d/templates
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/etc/logstash/conf.d/templates/pf-geoip-template.json
+  mkdir -p /etc/pfELK/logs/
+  cd /etc/pfELK/
+  wget -q https://raw.githubusercontent.com/3ilson/pfelk/master/error-data.sh
+  chmod +x /etc/logstash/pfelk-error.sh
+  header
+  script_logo
+  echo -e "\\n${WHITE_R}#${RESET} Setting up pfELK File Structure.\\n\\n"
+  sleep 4
+}
+download_pfelk
+
+header
+echo -e "${WHITE_R}#${RESET} Please provide the IP address (LAN) for your firewall.${RESET}"; 
+echo -e "${WHITE_R}#${RESET} Example: 192.168.0.1${RESET}";
+echo -e "${RED}# WARNING${RESET} This address must be accessible from the pfELK installation host!\\n\\n"
+read -p "Enter Your Firewall's IP Adress: " input_ip
+sed -e s/"192.168.0.1"/${input_ip}/g -i /etc/logstash/conf.d/01-inputs.conf
+sleep 2
+
+#Configure 01-inputs.conf for OPNsense or pfSense
+echo -e "${WHITE_R}#${RESET} Please select firewall distribution type, for configuration.${RESET}\\n";
+SenseType='Please specify your firewall type: '
+options=("OPNsense" "pfSense" "Exit")
+select opt in "${options[@]}"
+do
+	case $opt in
+	    "OPNsense")
+	      sed -e s/#OPN#//g -i /etc/logstash/conf.d/01-inputs.conf 
+	      echo -e "\\n";
+		  echo -e "${RED}#${RESET} pfELK configured for OPNsense!\\n"
+	      sleep 3
+	      echo -e "\\n"
+	      break
+	      ;;
+	    "pfSense")
+	      sed -e s/#pf#//g -i /etc/logstash/conf.d/01-inputs.conf 
+	      echo -e "\\n";
+		  echo -e "${RED}#${RESET} pfELK configured for pfSense!\\n"
+	      sleep 3
+	      echo -e "\\n"
+	      break
+	      ;;
+	    "Exit")
+	      exit 0;;
+	    *) echo "invalid option $REPLY";;
+	esac
+done
+
 #Elasticsearch Install.
 if dpkg -l | grep "elasticsearch" | grep -q "^ii\\|^hi"; then
   header
@@ -1282,6 +1326,15 @@ rm --force "$kibana_temp" 2> /dev/null
 service kibana start || abort
 sleep 3
 
+###################################################################################################################################################################################################
+#                                                                                                                                                                                                 #
+#                                                                                               Finish                                                                                            #
+#                                                                                                                                                                                                 #
+###################################################################################################################################################################################################
+
+#Configure Firewall (OPNsense or pfSense) IP Address
+
+
 # Check if Elasticsearch service is enabled
 if ! [[ "${os_codename}" =~ (precise|maya|trusty|qiana|rebecca|rafaela|rosa) ]]; then
     SERVICE_ELASTIC=$(systemctl is-enabled elasticsearch)
@@ -1333,14 +1386,13 @@ if dpkg -l | grep "logstash" | grep -q "^ii\\|^hi"; then
   header
   echo -e "${GREEN}#${RESET} pfELK was installed successfully"
   echo -e "\\n"
-  systemctl is-active -q elasticsearch && echo -e "${GREEN}#${RESET} Elasticsearch is active ( running )" || echo -e "${RED}#${RESET} Elasticsearch failed to start... Please open an issue (pfelk.3ilson.dev) on github!"
-  systemctl is-active -q logstash && echo -e "${GREEN}#${RESET} Logstash is active ( running )" || echo -e "${RED}#${RESET} Logstash failed to start... Please open an issue (pfelk.3ilson.dev) on github!"
-  systemctl is-active -q kibana && echo -e "${GREEN}#${RESET} Kibana is active ( running )" || echo -e "${RED}#${RESET} Kibana failed to start... Please open an issue (pfelk.3ilson.dev) on github!"
+  systemctl is-active -q kibana && echo -e "${GREEN}#${RESET} Logstash is active ( running )" || echo -e "${RED}#${RESET} Logstash failed to start... Please open an issue (pfelk.3ilson.dev) on github!"
   echo -e "\\n"
+  sleep 5
   remove_yourself
 else
   header_red
-  echo -e "\\n${RED}#${RESET} Failed to successfully install pfELK ${pfelk_clean}"
+  echo -e "\\n${RED}#${RESET} Failed to successfully install pfELK"
   echo -e "${RED}#${RESET} Please contact pfELK (pfELK.3ilson.dev) on github!${RESET}\\n\\n"
   remove_yourself
 fi
