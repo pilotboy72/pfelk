@@ -1,18 +1,18 @@
 ## Welcome to (pfSense/OPNsense) + Elastic Stack  
 
-![pfelk dashboard](https://github.com/3ilson/pfelk/raw/master/Images/pfelk-dashboard.png)
+![pfelk dashboard](https://raw.githubusercontent.com/3ilson/pfelk/master/Images/dashboards.gif)
 
 You can view installation guide guide on [3ilson.org YouTube Channel](https://www.youtube.com/3ilsonorg).
 
 
-![Version badge](https://img.shields.io/badge/ELK-7.8.0-blue.svg)
+![Version badge](https://img.shields.io/badge/ELK-7.9.1-blue.svg)
 ![Travis (.org)](https://img.shields.io/travis/3ilson/ansible-pfelk?label=Ansible-playbook) ![Travis (.org)](https://img.shields.io/travis/3ilson/docker-pfelk?label=Docker-compose) [![Gitter](https://badges.gitter.im/pfelk/community.svg)](https://gitter.im/pfelk/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/a3ilson) 
 
 ### Prerequisites
 - Ubuntu Server v18.04+ or Debian Server 9+ (stretch and buster are tested)
 - pfSense v2.4.4+ or OPNsense 19.7.4+
-- The following was tested with Java v11 LTS and Elastic Stack v7.8.0
+- The following was tested with Java v11 LTS and Elastic Stack v7.9.1
 - Minimum of 4GB of RAM but recommend 32GB
 
 **pfelk** is a highly customizable **open-source** tool for ingesting and visualizing your firewall traffic with the full power of Elasticsearch, Logstash and Kibana.
@@ -32,9 +32,11 @@ Supported entries include:
  - IPv4/IPv6 mapping
  - pfSense CARP data
  - openVPN log parsing
- - Unbound DNS Resolver
+ - Unbound DNS Resolver with dashboards
  - Suricata IDS with dashboards
  - Snort IDS with dashboards
+ - Squid with dashboards
+ - HAProxy
 
 **pfelk** aims to replace the vanilla pfSense/opnSense web UI with extended search and visualization features. You can deploy this solution via **ansible-playbook**, **docker-compose**, **bash script**, or manually.
 
@@ -43,7 +45,7 @@ Supported entries include:
 * [Installation](https://github.com/3ilson/pfelk#installation)
   * [ansible](https://github.com/3ilson/pfelk#ansible-playbook)
   * [docker](https://github.com/3ilson/pfelk#docker-compose)
-  * [manual installation/script](https://github.com/3ilson/pfelk#manual-installationscript)
+  * [manual installation/script](https://github.com/3ilson/pfelk#manual-installationscript---preferred-manual-method)
 * [Roadmap](https://github.com/3ilson/pfelk#roadmap)
 * [Comparison to similar solutions](https://github.com/3ilson/pfelk#comparison-to-similar-solutions)
 * [Contributing](https://github.com/3ilson/pfelk#contributing)
@@ -64,20 +66,20 @@ Supported entries include:
  * `$ docker-compose up`
 
 #### manual installation/script - preferred manual method
-* Download installer script from [pfelk](https://raw.githubusercontent.com/3ilson/pfelk/master/pfelk-install-1.0.0.sh) repository
+* Download installer script from [pfelk](https://raw.githubusercontent.com/3ilson/pfelk/master/pfelk-install-5.5.0.sh) repository
 ##### Ubuntu
-* `$ sudo wget https://raw.githubusercontent.com/3ilson/pfelk/master/pfelk-install-1.0.0.sh`
+* `$ sudo wget https://raw.githubusercontent.com/3ilson/pfelk/master/pfelk-install-5.5.0.sh`
 * Make script executable 
-* `$ sudo chmod +x pfelk-install-1.0.0.sh`
+* `$ sudo chmod +x pfelk-install-5.5.0.sh`
 * Run installer script 
-* `$ sudo ./pfelk-install-1.0.0.sh`
+* `$ sudo ./pfelk-install-5.5.0.sh`
 * Finish Configuring [here](https://github.com/3ilson/pfelk/blob/master/install/script.md)
 ##### Debian
-* `$ wget https://raw.githubusercontent.com/3ilson/pfelk/master/pfelk-install-1.0.0.sh`
+* `$ wget https://raw.githubusercontent.com/3ilson/pfelk/master/pfelk-install-5.5.0.sh`
 * Make script executable 
-* `$ chmod +x pfelk-install-1.0.0.sh`
+* `$ chmod +x pfelk-install-5.5.0.sh`
 * Run installer script 
-* `$ ./pfelk-install-1.0.0.sh`
+* `$ ./pfelk-install-5.5.0.sh`
 * Finish Configuring [here](https://github.com/3ilson/pfelk/blob/master/install/script.md)
 
 #### manual installation
@@ -93,7 +95,7 @@ This is the experimental public roadmap for the pfelk project.
 [Comparisions »](https://github.com/3ilson/pfelk/wiki/Comparison)
 
 ### Contributing
-Please reference to the CONTRIBUTING.md. Collectively we can enhance and improve this product. Issues, feature requests, pulls, and documentation contributions in are encouraged and welcomed!
+Please reference to the [CONTRIBUTING file](https://github.com/3ilson/pfelk/blob/master/CONTRIBUTING.md). Collectively we can enhance and improve this product. Issues, feature requests, PRs, and documentation contributions are encouraged and welcomed!
 
 ### License
-This project is licensed under the terms of the Apache 2.0 open source license. Please refer to LICENSE for the full terms.
+This project is licensed under the terms of the Apache 2.0 open source license. Please refer to [LICENSE](https://github.com/3ilson/pfelk/blob/master/license) for the full terms.
